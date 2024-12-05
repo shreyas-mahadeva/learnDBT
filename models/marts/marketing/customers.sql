@@ -11,6 +11,11 @@ orders as (
 
 ),
 
+transactions as (
+    select * 
+    from {{ ref('stg_stripe_payment') }}
+),
+
 customer_orders as (
 
     select
@@ -26,6 +31,13 @@ customer_orders as (
 
 ),
 
+customer_spend as (
+    select orders.customer_id, transactions.orderid, sum(transactions.amount) as lifetime_value
+from transactions, orders
+where transactions.orderid = orders.order_id
+group by orders.customer_id, transactions.orderid
+),
+
 final as (
 
     select
@@ -34,11 +46,13 @@ final as (
         customers.last_name,
         customer_orders.first_order_date,
         customer_orders.most_recent_order_date,
-        coalesce(customer_orders.number_of_orders, 0) as number_of_orders
+        coalesce(customer_orders.number_of_orders, 0) as number_of_orders,
+        customer_spend.lifetime_value
 
     from customers
 
     left join customer_orders using (customer_id)
+    left join customer_spend using (customer_id)
 
 )
 
